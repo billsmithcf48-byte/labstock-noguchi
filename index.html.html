@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0a0f1e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>LabStock — Almacén de Laboratorio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
+<style>
+:root{
+  --bg:#0a0f1e;
+  --bg2:#111827;
+  --bg3:#1a2235;
+  --bg4:#232d42;
+  --border:#ffffff14;
+  --border2:#ffffff22;
+  --text:#f0f4ff;
+  --text2:#8892aa;
+  --text3:#5a6480;
+  --accent:#3b82f6;
+  --accent2:#60a5fa;
+  --accent-bg:#3b82f614;
+  --green:#22c55e;
+  --green-bg:#22c55e14;
+  --amber:#f59e0b;
+  --amber-bg:#f59e0b14;
+  --red:#ef4444;
+  --red-bg:#ef444414;
+  --purple:#a855f7;
+  --purple-bg:#a855f714;
+  --radius:12px;
+  --radius-sm:8px;
+  --font:'Space Grotesk',sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+
+/* HEADER */
+.app-header{
+  background:linear-gradient(135deg,#0a0f1e 0%,#111827 100%);
+  border-bottom:1px solid var(--border);
+  padding:14px 16px;
+  display:flex;align-items:center;gap:12px;
+  position:sticky;top:0;z-index:100;
+  backdrop-filter:blur(20px);
+}
+.logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--purple));display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.logo i{font-size:18px;color:#fff}
+.app-title{font-size:16px;font-weight:700;letter-spacing:-.3px}
+.app-sub{font-size:11px;color:var(--text2);margin-top:1px}
+.header-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:var(--text3);flex-shrink:0;transition:background .3s}
+.sync-dot.online{background:var(--green);box-shadow:0 0 8px var(--green)}
+.sync-dot.syncing{background:var(--amber);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.device-count{font-size:11px;color:var(--text2);background:var(--bg3);padding:4px 8px;border-radius:20px;border:1px solid var(--border)}
+
+/* NAV */
+.bottom-nav{
+  position:fixed;bottom:0;left:0;right:0;
+  background:var(--bg2);
+  border-top:1px solid var(--border);
+  display:grid;grid-template-columns:repeat(5,1fr);
+  z-index:100;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+.nav-item{display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 4px 8px;cursor:pointer;border:none;background:transparent;color:var(--text3);font-family:var(--font);font-size:10px;font-weight:500;transition:color .15s;position:relative}
+.nav-item i{font-size:20px}
+.nav-item.active{color:var(--accent)}
+.nav-item.active::before{content:'';position:absolute;top:0;left:20%;right:20%;height:2px;background:var(--accent);border-radius:0 0 3px 3px}
+.nav-badge{position:absolute;top:6px;right:calc(50% - 16px);background:var(--red);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;min-width:16px;text-align:center;display:none}
+.nav-badge.show{display:block}
+
+/* CONTENT */
+.content{padding:16px;padding-bottom:calc(80px + env(safe-area-inset-bottom));max-width:480px;margin:0 auto}
+.section{display:none}.section.active{display:block}
+
+/* CARDS */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+.card-title{font-size:13px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px;display:flex;align-items:center;gap:6px}
+.card-title i{font-size:16px}
+
+/* METRICS */
+.metrics-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.metric{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;position:relative;overflow:hidden}
+.metric::after{content:'';position:absolute;bottom:-10px;right:-10px;width:50px;height:50px;border-radius:50%;opacity:.06}
+.metric.blue::after{background:var(--accent)}
+.metric.green::after{background:var(--green)}
+.metric.amber::after{background:var(--amber)}
+.metric.red::after{background:var(--red)}
+.metric-val{font-size:28px;font-weight:700;line-height:1;margin-bottom:4px}
+.metric-val.blue{color:var(--accent)}
+.metric-val.green{color:var(--green)}
+.metric-val.amber{color:var(--amber)}
+.metric-val.red{color:var(--red)}
+.metric-lbl{font-size:11px;color:var(--text2);font-weight:500}
+.metric-icon{position:absolute;top:12px;right:12px;font-size:18px;opacity:.3}
+
+/* DEVICES */
+.devices-bar{display:flex;gap:8px;overflow-x:auto;margin-bottom:12px;padding-bottom:4px;scrollbar-width:none}
+.devices-bar::-webkit-scrollbar{display:none}
+.device-chip{flex-shrink:0;display:flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border);padding:6px 12px;border-radius:20px;font-size:12px;color:var(--text2)}
+.device-chip .dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green)}
+.device-chip.me{border-color:var(--accent);color:var(--accent2)}
+.device-chip.me .dot{background:var(--accent)}
+
+/* FORMS */
+.form-group{margin-bottom:12px}
+.form-label{font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;display:block}
+.form-input{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:11px 14px;font-family:var(--font);font-size:14px;color:var(--text);outline:none;transition:border .15s}
+.form-input:focus{border-color:var(--accent)}
+.form-input::placeholder{color:var(--text3)}
+.form-select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235a6480' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.input-with-btn{display:flex;gap:6px}
+.input-with-btn .form-input{flex:1}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:11px 18px;border-radius:var(--radius-sm);border:none;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;width:100%;letter-spacing:.2px}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#2563eb}
+.btn-success{background:var(--green);color:#fff}
+.btn-success:hover{background:#16a34a}
+.btn-danger{background:var(--red);color:#fff}
+.btn-danger:hover{background:#dc2626}
+.btn-excel{background:#1D6F42;color:#fff}
+.btn-secondary{background:var(--bg3);border:1px solid var(--border2);color:var(--text)}
+.btn-icon{width:40px;height:40px;padding:0;border-radius:var(--radius-sm);flex-shrink:0}
+.btn-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.btn-row .btn{margin-top:0}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600}
+.badge-ok{background:var(--green-bg);color:var(--green)}
+.badge-low{background:var(--amber-bg);color:var(--amber)}
+.badge-out{background:var(--red-bg);color:var(--red)}
+.badge-in{background:var(--accent-bg);color:var(--accent2)}
+.badge-ex{background:var(--purple-bg);color:var(--purple)}
+
+/* MESSAGES */
+.msg{padding:11px 14px;border-radius:var(--radius-sm);font-size:13px;margin-bottom:10px;display:none;align-items:center;gap:8px;font-weight:500}
+.msg.ok{background:var(--green-bg);color:var(--green);border:1px solid #22c55e30;display:flex}
+.msg.err{background:var(--red-bg);color:var(--red);border:1px solid #ef444430;display:flex}
+
+/* TABLES */
+.tbl-wrap{overflow-x:auto;border-radius:var(--radius-sm);border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:12px;min-width:320px}
+th{padding:9px 10px;font-size:10px;font-weight:700;color:var(--text3);background:var(--bg3);text-align:left;text-transform:uppercase;letter-spacing:.6px;white-space:nowrap}
+td{padding:9px 10px;border-top:1px solid var(--border);color:var(--text);white-space:nowrap;font-size:12px}
+tr:hover td{background:var(--bg3)}
+.mono{font-family:var(--mono);font-size:11px;color:var(--text2)}
+
+/* EMPTY */
+.empty{text-align:center;padding:2rem 1rem;color:var(--text3)}
+.empty i{font-size:32px;display:block;margin-bottom:8px;opacity:.4}
+
+/* SCAN SECTION */
+.scan-hero{text-align:center;padding:1.5rem 0}
+.scan-hero-icon{width:72px;height:72px;border-radius:20px;background:linear-gradient(135deg,var(--accent-bg),var(--purple-bg));border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
+.scan-hero-icon i{font-size:32px;color:var(--accent2)}
+.scan-hero-title{font-size:15px;font-weight:700;margin-bottom:6px}
+.scan-hero-sub{font-size:12px;color:var(--text2);line-height:1.5}
+
+.camera-wrap{border-radius:var(--radius);overflow:hidden;background:#000;position:relative;margin-bottom:12px}
+video{width:100%;display:block;border-radius:var(--radius)}
+.scan-overlay{position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none}
+.scan-line{position:absolute;left:10%;right:10%;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:scanline 2s ease-in-out infinite;box-shadow:0 0 8px var(--accent)}
+@keyframes scanline{0%,100%{top:15%}50%{top:80%}}
+.corner{position:absolute;width:20px;height:20px;border-color:rgba(255,255,255,.8);border-style:solid}
+.c-tl{top:8px;left:8px;border-width:3px 0 0 3px;border-radius:4px 0 0 0}
+.c-tr{top:8px;right:8px;border-width:3px 3px 0 0;border-radius:0 4px 0 0}
+.c-bl{bottom:8px;left:8px;border-width:0 0 3px 3px;border-radius:0 0 0 4px}
+.c-br{bottom:8px;right:8px;border-width:0 3px 3px 0;border-radius:0 0 4px 0}
+
+.found-card{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);padding:14px;margin-bottom:10px}
+.found-name{font-size:15px;font-weight:700;margin-bottom:4px}
+.found-meta{font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.5}
+
+/* SYNC ACTIVITY */
+.activity-item{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+.activity-item:last-child{border-bottom:none}
+.activity-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.activity-icon.in{background:var(--accent-bg)}
+.activity-icon.out{background:var(--purple-bg)}
+.activity-icon.sync{background:var(--green-bg)}
+.activity-icon i{font-size:15px}
+.activity-icon.in i{color:var(--accent2)}
+.activity-icon.out i{color:var(--purple)}
+.activity-icon.sync i{color:var(--green)}
+.activity-body{flex:1;min-width:0}
+.activity-title{font-size:13px;font-weight:600;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.activity-meta{font-size:11px;color:var(--text2)}
+
+/* EXPORT CARDS */
+.export-row{display:flex;align-items:center;gap:12px;padding:12px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:8px}
+.export-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.export-icon i{font-size:18px;color:#fff}
+.export-info{flex:1;min-width:0}
+.export-title{font-size:13px;font-weight:600;margin-bottom:1px}
+.export-sub{font-size:11px;color:var(--text2)}
+
+/* MODAL CAMERA */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:200;align-items:flex-end}
+.modal-overlay.open{display:flex}
+.modal-sheet{background:var(--bg2);border-radius:20px 20px 0 0;border:1px solid var(--border);padding:16px;width:100%;max-height:90vh;overflow-y:auto}
+.modal-handle{width:36px;height:4px;background:var(--border2);border-radius:2px;margin:0 auto 16px}
+.modal-title{font-size:15px;font-weight:700;margin-bottom:12px}
+
+/* CONN REQUIRED */
+.conn-banner{background:var(--amber-bg);border:1px solid #f59e0b30;border-radius:var(--radius-sm);padding:12px 14px;display:flex;align-items:center;gap:10px;margin-bottom:12px;font-size:13px;color:var(--amber)}
+.conn-banner i{font-size:18px;flex-shrink:0}
+
+/* TOAST */
+.toast{position:fixed;bottom:calc(80px + env(safe-area-inset-bottom) + 12px);left:50%;transform:translateX(-50%) translateY(20px);background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:10px 16px;font-size:13px;font-weight:500;color:var(--text);white-space:nowrap;z-index:300;opacity:0;transition:all .3s;pointer-events:none;display:flex;align-items:center;gap:8px}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.green{border-color:#22c55e40;color:var(--green)}
+.toast.red{border-color:#ef444440;color:var(--red)}
+
+/* COMPAT TAGS */
+.compat-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.compat-tag{font-size:11px;background:var(--bg3);border:1px solid var(--border);padding:4px 10px;border-radius:20px;color:var(--text2);display:flex;align-items:center;gap:4px}
+.compat-tag i{font-size:12px;color:var(--green)}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* CONFIG */
+.config-section{margin-bottom:20px}
+.config-label{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.config-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)}
+.config-row:last-child{border-bottom:none}
+.config-row-info{font-size:13px;font-weight:500}
+.config-row-sub{font-size:11px;color:var(--text2);margin-top:2px}
+.config-val{font-size:13px;color:var(--text2);font-family:var(--mono)}
+
+.tip-box{background:var(--accent-bg);border:1px solid #3b82f630;border-radius:var(--radius-sm);padding:12px 14px;font-size:12px;color:var(--accent2);line-height:1.6;margin-bottom:12px}
+.tip-box i{font-size:14px;vertical-align:-2px;margin-right:4px}
+</style>
+</head>
+<body>
+
+<div class="app-header">
+  <div class="logo"><i class="ti ti-flask" aria-hidden="true"></i></div>
+  <div>
+    <div class="app-title">LabStock</div>
+    <div class="app-sub">Almacén de laboratorio</div>
+  </div>
+  <div class="header-right">
+    <span class="device-count" id="device-count"><i class="ti ti-devices" aria-hidden="true"></i> 1</span>
+    <div class="sync-dot" id="sync-dot" title="Estado de conexión"></div>
+  </div>
+</div>
+
+<!-- CONTENT SECTIONS -->
+<div class="content">
+
+  <!-- PANEL -->
+  <div id="s-panel" class="section active">
+    <div class="devices-bar" id="devices-bar">
+      <div class="device-chip me"><div class="dot"></div><span id="my-device-name">Este dispositivo</span></div>
+    </div>
+    <div class="metrics-grid">
+      <div class="metric blue"><i class="ti ti-box metric-icon" aria-hidden="true"></i><div class="metric-val blue" id="m-total">0</div><div class="metric-lbl">Total ítems</div></div>
+      <div class="metric green"><i class="ti ti-check metric-icon" aria-hidden="true"></i><div class="metric-val green" id="m-ok">0</div><div class="metric-lbl">En stock</div></div>
+      <div class="metric amber"><i class="ti ti-alert-triangle metric-icon" aria-hidden="true"></i><div class="metric-val amber" id="m-low">0</div><div class="metric-lbl">Stock bajo</div></div>
+      <div class="metric red"><i class="ti ti-x metric-icon" aria-hidden="true"></i><div class="metric-val red" id="m-out">0</div><div class="metric-lbl">Agotados</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><i class="ti ti-alert-triangle" aria-hidden="true" style="color:var(--amber)"></i>Alertas de stock</div>
+      <div id="alert-list"><div class="empty"><i class="ti ti-check"></i>Sin alertas</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><i class="ti ti-activity" aria-hidden="true" style="color:var(--accent)"></i>Actividad reciente</div>
+      <div id="recent-moves"><div class="empty"><i class="ti ti-clock"></i>Sin movimientos aún</div></div>
+    </div>
+  </div>
+
+  <!-- INVENTARIO -->
+  <div id="s-inv" class="section">
+    <div class="card">
+      <div class="card-title"><i class="ti ti-circle-plus" aria-hidden="true" style="color:var(--accent)"></i>Agregar ítem</div>
+      <div id="inv-msg"></div>
+      <div class="form-group">
+        <label class="form-label">Código de barras / QR</label>
+        <div class="input-with-btn">
+          <input class="form-input" id="i-cod" placeholder="Escanea o escribe el código" autocomplete="off">
+          <button class="btn btn-primary btn-icon" onclick="openModal('i-cod',null)" aria-label="Cámara"><i class="ti ti-camera" aria-hidden="true"></i></button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nombre del ítem</label>
+        <input class="form-input" id="i-nom" placeholder="Ej: Ácido clorhídrico HCl">
+      </div>
+      <div class="form-row" style="margin-bottom:12px">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Categoría</label>
+          <select class="form-input form-select" id="i-cat">
+            <option>Reactivos</option><option>Consumibles</option><option>Equipos</option><option>Cristalería</option><option>EPP</option><option>Otros</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Unidad</label>
+          <select class="form-input form-select" id="i-uni">
+            <option>mL</option><option>L</option><option>g</option><option>kg</option><option>unidad</option><option>caja</option><option>frasco</option><option>par</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row" style="margin-bottom:12px">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Stock inicial</label>
+          <input class="form-input" id="i-stock" type="number" min="0" value="0">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Stock mínimo</label>
+          <input class="form-input" id="i-min" type="number" min="0" value="5">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ubicación</label>
+        <input class="form-input" id="i-loc" placeholder="Ej: Estante A-3, Caja 2">
+      </div>
+      <button class="btn btn-primary" onclick="addItem()"><i class="ti ti-plus" aria-hidden="true"></i>Agregar ítem</button>
+    </div>
+    <div class="card">
+      <div class="card-title"><i class="ti ti-list" aria-hidden="true"></i>Inventario</div>
+      <input class="form-input" id="inv-search" placeholder="Buscar por nombre o código..." oninput="renderInventory()" style="margin-bottom:10px">
+      <div id="inv-table"><div class="empty"><i class="ti ti-package"></i>Inventario vacío</div></div>
+    </div>
+  </div>
+
+  <!-- ESCANEAR -->
+  <div id="s-scan" class="section">
+    <div class="card">
+      <div class="card-title"><i class="ti ti-scan" aria-hidden="true" style="color:var(--accent)"></i>Escaneo rápido</div>
+      <div id="cam-idle-main">
+        <div class="scan-hero">
+          <div class="scan-hero-icon"><i class="ti ti-camera" aria-hidden="true"></i></div>
+          <div class="scan-hero-title">Lector de códigos</div>
+          <div class="scan-hero-sub">Usa la cámara del dispositivo o un lector USB/Bluetooth</div>
+        </div>
+        <button class="btn btn-primary" onclick="startMainCamera()" style="margin-bottom:10px"><i class="ti ti-camera" aria-hidden="true"></i>Abrir cámara</button>
+      </div>
+      <div id="cam-active-main" style="display:none">
+        <div class="camera-wrap">
+          <video id="main-video" playsinline autoplay muted></video>
+          <div class="scan-overlay">
+            <div class="scan-line"></div>
+            <div class="corner c-tl"></div><div class="corner c-tr"></div>
+            <div class="corner c-bl"></div><div class="corner c-br"></div>
+          </div>
+        </div>
+        <button class="btn btn-danger" onclick="stopMainCamera()" style="margin-bottom:10px"><i class="ti ti-x" aria-hidden="true"></i>Detener cámara</button>
+      </div>
+      <div class="form-group" style="margin-top:4px">
+        <label class="form-label">O ingresa el código manualmente</label>
+        <div class="input-with-btn">
+          <input class="form-input" id="scan-manual" placeholder="Código de barras..." autocomplete="off" onkeydown="if(event.key==='Enter'){doManualScan();}" style="font-family:var(--mono)">
+          <button class="btn btn-primary btn-icon" onclick="doManualScan()" aria-label="Buscar"><i class="ti ti-search" aria-hidden="true"></i></button>
+        </div>
+      </div>
+    </div>
+
+    <div id="scan-feedback-card" style="display:none" class="card">
+      <div id="scan-fb-msg" style="margin-bottom:12px;font-size:13px;font-weight:600"></div>
+      <div class="found-card" id="found-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+          <div class="found-name" id="sr-name"></div>
+          <span id="sr-status"></span>
+        </div>
+        <div class="found-meta" id="sr-info"></div>
+        <div class="form-row">
+          <div>
+            <label class="form-label">Cantidad</label>
+            <input class="form-input" type="number" id="sr-qty" min="1" value="1">
+          </div>
+          <div>
+            <label class="form-label">Responsable</label>
+            <input class="form-input" id="sr-ref" placeholder="Nombre...">
+          </div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-success" onclick="quickMove('ENTRADA')"><i class="ti ti-package-import" aria-hidden="true"></i>Entrada</button>
+        <button class="btn btn-danger" onclick="quickMove('SALIDA')"><i class="ti ti-package-export" aria-hidden="true"></i>Salida</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:4px">
+      <div class="card-title"><i class="ti ti-wifi" aria-hidden="true" style="color:var(--green)"></i>Compatibilidad</div>
+      <div class="compat-tags">
+        <div class="compat-tag"><i class="ti ti-check" aria-hidden="true"></i>Cámara móvil</div>
+        <div class="compat-tag"><i class="ti ti-check" aria-hidden="true"></i>USB HID</div>
+        <div class="compat-tag"><i class="ti ti-check" aria-hidden="true"></i>Bluetooth</div>
+        <div class="compat-tag"><i class="ti ti-check" aria-hidden="true"></i>EAN-13</div>
+        <div class="compat-tag"><i class="ti ti-check" aria-hidden="true"></i>Code 128</div>
+        <div class="compat-tag"><i class="ti ti-check" aria-hidden="true"></i>QR</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MOVIMIENTOS -->
+  <div id="s-mov" class="section">
+    <div class="card" style="margin-bottom:8px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <button class="btn btn-success" id="mov-tab-ent" onclick="switchMovTab('ent')"><i class="ti ti-package-import" aria-hidden="true"></i>Entrada</button>
+        <button class="btn btn-secondary" id="mov-tab-sal" onclick="switchMovTab('sal')"><i class="ti ti-package-export" aria-hidden="true"></i>Salida</button>
+      </div>
+    </div>
+
+    <!-- ENTRADA -->
+    <div id="mov-ent" class="card">
+      <div class="card-title" style="color:var(--accent2)"><i class="ti ti-package-import" aria-hidden="true"></i>Registrar entrada</div>
+      <div id="ent-msg"></div>
+      <div class="form-group">
+        <label class="form-label">Código de barras</label>
+        <div class="input-with-btn">
+          <input class="form-input" id="e-scan" placeholder="Escanea o escribe..." autocomplete="off" onkeydown="if(event.key==='Enter')scanToSelect('e-scan','e-item','e-sinfo')" style="font-family:var(--mono)">
+          <button class="btn btn-primary btn-icon" onclick="openModal('e-scan','e-item')" aria-label="Cámara"><i class="ti ti-camera" aria-hidden="true"></i></button>
+          <button class="btn btn-secondary btn-icon" onclick="scanToSelect('e-scan','e-item','e-sinfo')" aria-label="Buscar"><i class="ti ti-search" aria-hidden="true"></i></button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ítem</label>
+        <select class="form-input form-select" id="e-item" onchange="showStockInfo('e-item','e-sinfo')"><option value="">— Seleccionar ítem —</option></select>
+        <div id="e-sinfo" style="font-size:11px;color:var(--text2);margin-top:5px;display:flex;align-items:center;gap:4px"></div>
+      </div>
+      <div class="form-row" style="margin-bottom:12px">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Cantidad</label>
+          <input class="form-input" id="e-qty" type="number" min="1" value="1">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Proveedor</label>
+          <input class="form-input" id="e-prov" placeholder="Nombre...">
+        </div>
+      </div>
+      <div class="form-row" style="margin-bottom:12px">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">N° Factura / Lote</label>
+          <input class="form-input" id="e-fact" placeholder="FAC-2025-001">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Observaciones</label>
+          <input class="form-input" id="e-obs" placeholder="Notas...">
+        </div>
+      </div>
+      <button class="btn btn-success" onclick="registerEntry()"><i class="ti ti-package-import" aria-hidden="true"></i>Registrar entrada</button>
+    </div>
+
+    <!-- SALIDA -->
+    <div id="mov-sal" class="card" style="display:none">
+      <div class="card-title" style="color:var(--purple)"><i class="ti ti-package-export" aria-hidden="true"></i>Registrar salida</div>
+      <div id="sal-msg"></div>
+      <div class="form-group">
+        <label class="form-label">Código de barras</label>
+        <div class="input-with-btn">
+          <input class="form-input" id="s-scan" placeholder="Escanea o escribe..." autocomplete="off" onkeydown="if(event.key==='Enter')scanToSelect('s-scan','s-item','s-sinfo')" style="font-family:var(--mono)">
+          <button class="btn btn-primary btn-icon" onclick="openModal('s-scan','s-item')" aria-label="Cámara"><i class="ti ti-camera" aria-hidden="true"></i></button>
+          <button class="btn btn-secondary btn-icon" onclick="scanToSelect('s-scan','s-item','s-sinfo')" aria-label="Buscar"><i class="ti ti-search" aria-hidden="true"></i></button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ítem</label>
+        <select class="form-input form-select" id="s-item" onchange="showStockInfo('s-item','s-sinfo')"><option value="">— Seleccionar ítem —</option></select>
+        <div id="s-sinfo" style="font-size:11px;color:var(--text2);margin-top:5px;display:flex;align-items:center;gap:4px"></div>
+      </div>
+      <div class="form-row" style="margin-bottom:12px">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Cantidad</label>
+          <input class="form-input" id="s-qty" type="number" min="1" value="1">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Solicitado por</label>
+          <input class="form-input" id="s-user" placeholder="Responsable...">
+        </div>
+      </div>
+      <div class="form-row" style="margin-bottom:12px">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Área / Proyecto</label>
+          <input class="form-input" id="s-area" placeholder="Lab. Química...">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Observaciones</label>
+          <input class="form-input" id="s-obs" placeholder="Motivo...">
+        </div>
+      </div>
+      <button class="btn btn-danger" onclick="registerExit()"><i class="ti ti-package-export" aria-hidden="true"></i>Registrar salida</button>
+    </div>
+
+    <!-- HISTORIAL -->
+    <div class="card" style="margin-top:4px">
+      <div class="card-title"><i class="ti ti-history" aria-hidden="true"></i>Historial</div>
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <input class="form-input" id="hist-search" placeholder="Buscar..." oninput="renderHistory()" style="flex:1">
+        <select class="form-input form-select" id="hist-filter" onchange="renderHistory()" style="width:110px">
+          <option value="">Todos</option><option value="ENTRADA">Entradas</option><option value="SALIDA">Salidas</option>
+        </select>
+      </div>
+      <div id="hist-table"><div class="empty"><i class="ti ti-history"></i>Sin movimientos</div></div>
+    </div>
+  </div>
+
+  <!-- EXPORTAR + CONFIG -->
+  <div id="s-mas" class="section">
+    <div class="card">
+      <div class="card-title"><i class="ti ti-file-spreadsheet" aria-hidden="true" style="color:#22c55e"></i>Exportar Excel</div>
+      <div id="rep-msg"></div>
+      <div class="export-row"><div class="export-icon" style="background:#185FA5"><i class="ti ti-package" aria-hidden="true"></i></div><div class="export-info"><div class="export-title">Inventario</div><div class="export-sub">Lista completa de ítems</div></div><button class="btn btn-excel btn-icon" onclick="exportInventarioExcel()" aria-label="Descargar"><i class="ti ti-download" aria-hidden="true"></i></button></div>
+      <div class="export-row"><div class="export-icon" style="background:#7c3aed"><i class="ti ti-history" aria-hidden="true"></i></div><div class="export-info"><div class="export-title">Historial</div><div class="export-sub">Entradas y salidas</div></div><button class="btn btn-excel btn-icon" onclick="exportHistorialExcel()" aria-label="Descargar"><i class="ti ti-download" aria-hidden="true"></i></button></div>
+      <div class="export-row"><div class="export-icon" style="background:#d97706"><i class="ti ti-alert-triangle" aria-hidden="true"></i></div><div class="export-info"><div class="export-title">Alertas de stock</div><div class="export-sub">Stock bajo y agotados</div></div><button class="btn btn-excel btn-icon" onclick="exportAlertasExcel()" aria-label="Descargar"><i class="ti ti-download" aria-hidden="true"></i></button></div>
+      <div class="export-row"><div class="export-icon" style="background:#1D6F42"><i class="ti ti-report" aria-hidden="true"></i></div><div class="export-info"><div class="export-title">Reporte completo</div><div class="export-sub">3 hojas en un archivo</div></div><button class="btn btn-excel btn-icon" onclick="exportCompletoExcel()" aria-label="Descargar"><i class="ti ti-download" aria-hidden="true"></i></button></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><i class="ti ti-settings" aria-hidden="true"></i>Configuración Firebase</div>
+      <div class="tip-box"><i class="ti ti-info-circle" aria-hidden="true"></i>Para activar la sincronización en tiempo real, crea un proyecto gratuito en <strong>console.firebase.google.com</strong>, habilita Realtime Database y pega tu configuración aquí.</div>
+      <div class="form-group">
+        <label class="form-label">API Key</label>
+        <input class="form-input" id="cfg-apikey" placeholder="AIzaSy..." autocomplete="off" onchange="saveConfig()">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Database URL</label>
+        <input class="form-input" id="cfg-dburl" placeholder="https://mi-lab-default-rtdb.firebaseio.com" onchange="saveConfig()">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Project ID</label>
+        <input class="form-input" id="cfg-projid" placeholder="mi-laboratorio-123" onchange="saveConfig()">
+      </div>
+      <div class="form-group">
+        <label class="form-label">App ID</label>
+        <input class="form-input" id="cfg-appid" placeholder="1:123456789:web:abc..." onchange="saveConfig()">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nombre de este dispositivo</label>
+        <input class="form-input" id="cfg-devname" placeholder="PC Lab 1 / Tablet / Teléfono..." onchange="saveDeviceName()">
+      </div>
+      <button class="btn btn-primary" onclick="initFirebase()" style="margin-top:4px"><i class="ti ti-cloud-upload" aria-hidden="true"></i>Conectar a Firebase</button>
+      <div id="firebase-msg" style="margin-top:10px"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><i class="ti ti-info-circle" aria-hidden="true"></i>Información</div>
+      <div class="config-section">
+        <div class="config-label">Estado de sincronización</div>
+        <div class="config-row"><div><div class="config-row-info">Estado</div><div class="config-row-sub">Conexión con Firebase</div></div><span id="cfg-status" class="badge badge-low">Sin conectar</span></div>
+        <div class="config-row"><div><div class="config-row-info">Dispositivos en red</div><div class="config-row-sub">Activos ahora mismo</div></div><span class="config-val" id="cfg-devcount">1</span></div>
+        <div class="config-row"><div><div class="config-row-info">Último sync</div></div><span class="config-val" id="cfg-lastsync">—</span></div>
+        <div class="config-row"><div><div class="config-row-info">Base de datos local</div><div class="config-row-sub">Guardado en este navegador</div></div><span class="badge badge-ok" id="cfg-ls-status">Activo</span></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /content -->
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav" aria-label="Navegación principal">
+  <button class="nav-item active" onclick="showSection('panel',this)" aria-label="Panel">
+    <i class="ti ti-layout-dashboard" aria-hidden="true"></i>Panel
+  </button>
+  <button class="nav-item" onclick="showSection('inv',this)" aria-label="Inventario">
+    <i class="ti ti-package" aria-hidden="true"></i>Inventario
+  </button>
+  <button class="nav-item" onclick="showSection('scan',this)" aria-label="Escanear">
+    <i class="ti ti-scan" aria-hidden="true"></i>Escanear
+  </button>
+  <button class="nav-item" onclick="showSection('mov',this)" aria-label="Movimientos">
+    <span class="nav-badge" id="hist-badge">0</span>
+    <i class="ti ti-arrows-exchange" aria-hidden="true"></i>Movimientos
+  </button>
+  <button class="nav-item" onclick="showSection('mas',this)" aria-label="Más">
+    <i class="ti ti-dots" aria-hidden="true"></i>Más
+  </button>
+</nav>
+
+<!-- MODAL CAMERA -->
+<div class="modal-overlay" id="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Escanear código</div>
+    <div class="camera-wrap">
+      <video id="modal-video" playsinline autoplay muted></video>
+      <div class="scan-overlay">
+        <div class="scan-line"></div>
+        <div class="corner c-tl"></div><div class="corner c-tr"></div>
+        <div class="corner c-bl"></div><div class="corner c-br"></div>
+      </div>
+    </div>
+    <div id="modal-fb" style="font-size:13px;color:var(--text2);text-align:center;padding:8px;margin-bottom:12px">Apunta la cámara al código de barras o QR</div>
+    <button class="btn btn-danger" onclick="closeModal()"><i class="ti ti-x" aria-hidden="true"></i>Cancelar</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast" role="alert" aria-live="polite"></div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getDatabase, ref, set, onValue, push, remove, update, onDisconnect, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
+// ─── STATE ───────────────────────────────────────────────
+let items = {};
+let moves = [];
+let lastScanned = null;
+let mainReader = null, modalReader = null;
+let modalTargetInput = null, modalTargetSelect = null;
+let db = null, firebaseApp = null;
+let myDeviceId = 'dev_' + Math.random().toString(36).slice(2,8);
+let myDeviceName = 'Dispositivo';
+let onlineDevices = {};
+let isFirebaseConnected = false;
+
+// ─── LOCAL STORAGE PERSISTENCE ───────────────────────────
+const LS_ITEMS = 'labstock_items';
+const LS_MOVES = 'labstock_moves';
+
+function lsSaveItems() {
+  try { localStorage.setItem(LS_ITEMS, JSON.stringify(items)); } catch(e) {}
+}
+function lsSaveMoves() {
+  try { localStorage.setItem(LS_MOVES, JSON.stringify(moves)); } catch(e) {}
+}
+function lsLoadData() {
+  try {
+    const savedItems = localStorage.getItem(LS_ITEMS);
+    if (savedItems) items = JSON.parse(savedItems);
+    const savedMoves = localStorage.getItem(LS_MOVES);
+    if (savedMoves) moves = JSON.parse(savedMoves);
+  } catch(e) {}
+}
+
+// ─── INIT ─────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  loadConfig();
+  lsLoadData();
+  myDeviceName = localStorage.getItem('lab_devname') || ('Dispositivo ' + myDeviceId.slice(-4));
+  document.getElementById('my-device-name').textContent = myDeviceName;
+  document.getElementById('cfg-devname').value = myDeviceName;
+  setSyncDot('offline');
+  renderInventory(); renderDash(); populateSelects(); renderHistory();
+});
+
+// ─── FIREBASE ─────────────────────────────────────────────
+window.initFirebase = async function() {
+  const apiKey = document.getElementById('cfg-apikey').value.trim();
+  const dbURL  = document.getElementById('cfg-dburl').value.trim();
+  const projId = document.getElementById('cfg-projid').value.trim();
+  const appId  = document.getElementById('cfg-appid').value.trim();
+  if (!apiKey || !dbURL || !projId || !appId) {
+    showFbMsg('err', 'Completa todos los campos de configuración.');
+    return;
+  }
+  try {
+    if (firebaseApp) { try { firebaseApp.delete(); } catch(e){} }
+    firebaseApp = initializeApp({ apiKey, authDomain:`${projId}.firebaseapp.com`, databaseURL:dbURL, projectId:projId, appId }, 'lab_' + Date.now());
+    db = getDatabase(firebaseApp);
+    setSyncDot('syncing');
+    subscribeAll();
+    registerPresence();
+    isFirebaseConnected = true;
+    showFbMsg('ok', '✓ Conectado a Firebase. Sincronización activa.');
+    document.getElementById('cfg-status').className = 'badge badge-ok';
+    document.getElementById('cfg-status').textContent = 'Conectado';
+    showToast('Sincronización activa', 'green');
+  } catch(e) {
+    showFbMsg('err', 'Error: ' + e.message);
+    setSyncDot('offline');
+  }
+};
+
+function subscribeAll() {
+  onValue(ref(db,'items'), snap => {
+    items = snap.val() || {};
+    renderInventory(); renderDash(); populateSelects();
+    document.getElementById('cfg-lastsync').textContent = nowShort();
+    setSyncDot('online');
+  });
+  onValue(ref(db,'moves'), snap => {
+    const raw = snap.val() || {};
+    moves = Object.values(raw).sort((a,b)=>b.ts - a.ts);
+    renderHistory(); renderDash();
+  });
+  onValue(ref(db,'devices'), snap => {
+    onlineDevices = snap.val() || {};
+    renderDevices();
+  });
+}
+
+function registerPresence() {
+  const devRef = ref(db, 'devices/' + myDeviceId);
+  set(devRef, { name: myDeviceName, ts: Date.now(), online: true });
+  onDisconnect(devRef).remove();
+  setInterval(() => { if(db) set(devRef, { name: myDeviceName, ts: Date.now(), online: true }); }, 30000);
+}
+
+function renderDevices() {
+  const bar = document.getElementById('devices-bar');
+  const now = Date.now();
+  const active = Object.entries(onlineDevices).filter(([id,d]) => now - d.ts < 90000);
+  document.getElementById('cfg-devcount').textContent = active.length;
+  document.getElementById('device-count').innerHTML = `<i class="ti ti-devices" aria-hidden="true"></i> ${active.length}`;
+  let html = `<div class="device-chip me"><div class="dot"></div><span>${myDeviceName}</span></div>`;
+  active.forEach(([id, d]) => {
+    if (id === myDeviceId) return;
+    html += `<div class="device-chip"><div class="dot"></div><span>${d.name}</span></div>`;
+  });
+  bar.innerHTML = html;
+}
+
+// ─── DATA LAYER ──────────────────────────────────────────
+function saveItem(item) {
+  if (db) {
+    set(ref(db, 'items/' + item.id), item);
+  } else {
+    items[item.id] = item;
+    lsSaveItems();
+    renderInventory(); renderDash(); populateSelects();
+  }
+}
+
+function deleteItemData(id) {
+  if (db) { remove(ref(db, 'items/' + id)); }
+  else { delete items[id]; lsSaveItems(); renderInventory(); renderDash(); }
+}
+
+function saveMove(move) {
+  if (db) {
+    push(ref(db, 'moves'), move);
+  } else {
+    move.ts = Date.now();
+    moves.unshift(move);
+    lsSaveMoves();
+    renderHistory(); renderDash();
+  }
+}
+
+function updateStock(id, newStock) {
+  if (db) { update(ref(db, 'items/' + id), { stock: newStock }); }
+  else { if(items[id]) items[id].stock = newStock; lsSaveItems(); renderDash(); populateSelects(); }
+}
+
+// ─── CORE FUNCTIONS ──────────────────────────────────────
+window.addItem = function() {
+  const cod = document.getElementById('i-cod').value.trim();
+  const nom = document.getElementById('i-nom').value.trim();
+  if (!cod || !nom) { showMsg('inv-msg','err','Código y nombre obligatorios.'); return; }
+  const exists = Object.values(items).find(i => i.cod === cod);
+  if (exists) { showMsg('inv-msg','err',`Código "${cod}" ya existe.`); return; }
+  const item = {
+    id: 'item_' + Date.now(),
+    cod, nom,
+    cat: document.getElementById('i-cat').value,
+    uni: document.getElementById('i-uni').value,
+    loc: document.getElementById('i-loc').value.trim(),
+    stock: parseInt(document.getElementById('i-stock').value) || 0,
+    min: parseInt(document.getElementById('i-min').value) || 0,
+    addedBy: myDeviceName, addedAt: Date.now()
+  };
+  saveItem(item);
+  showMsg('inv-msg','ok',`"${nom}" agregado.`);
+  ['i-cod','i-nom','i-loc'].forEach(f => document.getElementById(f).value = '');
+  document.getElementById('i-stock').value = '0';
+  document.getElementById('i-min').value = '5';
+  showToast('Ítem agregado y sincronizado', 'green');
+};
+
+window.deleteItem = function(id) {
+  if (!confirm('¿Eliminar este ítem?')) return;
+  deleteItemData(id);
+  showToast('Ítem eliminado', 'red');
+};
+
+window.registerEntry = function() {
+  const id = document.getElementById('e-item').value;
+  const qty = parseInt(document.getElementById('e-qty').value);
+  if (!id) { showMsg('ent-msg','err','Selecciona un ítem.'); return; }
+  if (!qty || qty < 1) { showMsg('ent-msg','err','Cantidad inválida.'); return; }
+  const it = items[id];
+  const newStock = it.stock + qty;
+  updateStock(id, newStock);
+  saveMove({ fecha:now(), ts:Date.now(), tipo:'ENTRADA', cod:it.cod, nom:it.nom, qty, uni:it.uni, ref:document.getElementById('e-prov').value||'—', doc:document.getElementById('e-fact').value||'—', obs:document.getElementById('e-obs').value||'', stock:newStock, device:myDeviceName });
+  showMsg('ent-msg','ok',`+${qty} ${it.uni} de "${it.nom}". Stock: ${newStock}`);
+  clearMovForm('e'); showToast(`Entrada registrada: +${qty} ${it.uni}`, 'green');
+};
+
+window.registerExit = function() {
+  const id = document.getElementById('s-item').value;
+  const qty = parseInt(document.getElementById('s-qty').value);
+  if (!id) { showMsg('sal-msg','err','Selecciona un ítem.'); return; }
+  if (!qty || qty < 1) { showMsg('sal-msg','err','Cantidad inválida.'); return; }
+  const it = items[id];
+  if (qty > it.stock) { showMsg('sal-msg','err',`Stock insuficiente. Disponible: ${it.stock} ${it.uni}`); return; }
+  const newStock = it.stock - qty;
+  updateStock(id, newStock);
+  saveMove({ fecha:now(), ts:Date.now(), tipo:'SALIDA', cod:it.cod, nom:it.nom, qty, uni:it.uni, ref:document.getElementById('s-user').value||'—', doc:document.getElementById('s-area').value||'—', obs:document.getElementById('s-obs').value||'', stock:newStock, device:myDeviceName });
+  showMsg('sal-msg','ok',`-${qty} ${it.uni} de "${it.nom}". Stock: ${newStock}`);
+  clearMovForm('s'); showToast(`Salida registrada: -${qty} ${it.uni}`, 'green');
+};
+
+window.quickMove = function(tipo) {
+  if (!lastScanned) return;
+  const qty = parseInt(document.getElementById('sr-qty').value) || 1;
+  const ref2 = document.getElementById('sr-ref').value || '—';
+  const it = lastScanned;
+  if (tipo === 'SALIDA' && qty > it.stock) { showScanFb('err', `Stock insuficiente. Disponible: ${it.stock} ${it.uni}`); return; }
+  const newStock = tipo === 'ENTRADA' ? it.stock + qty : it.stock - qty;
+  updateStock(it.id, newStock);
+  saveMove({ fecha:now(), ts:Date.now(), tipo, cod:it.cod, nom:it.nom, qty, uni:it.uni, ref:ref2, doc:'—', obs:'Escaneo rápido', stock:newStock, device:myDeviceName });
+  showScanFb('ok', `${tipo} registrada: ${tipo==='ENTRADA'?'+':'-'}${qty} ${it.uni}. Stock: ${newStock}`);
+  document.getElementById('scan-feedback-card').style.display = 'none';
+  lastScanned = null;
+  showToast(`${tipo} registrada`, tipo === 'ENTRADA' ? 'green' : 'red');
+};
+
+// ─── RENDER ───────────────────────────────────────────────
+function renderInventory() {
+  const q = document.getElementById('inv-search').value.toLowerCase();
+  const all = Object.values(items);
+  const filtered = all.filter(i => i.nom.toLowerCase().includes(q) || i.cod.toLowerCase().includes(q));
+  if (!filtered.length) {
+    document.getElementById('inv-table').innerHTML = all.length ? '<div class="empty"><i class="ti ti-search"></i>Sin resultados</div>' : '<div class="empty"><i class="ti ti-package"></i>Inventario vacío</div>';
+    return;
+  }
+  let h = '<div class="tbl-wrap"><table><thead><tr><th>Código</th><th>Ítem</th><th>Stock</th><th>Estado</th><th></th></tr></thead><tbody>';
+  filtered.forEach(i => {
+    const st = i.stock === 0 ? '<span class="badge badge-out">Agotado</span>' : i.stock <= i.min ? '<span class="badge badge-low">Bajo</span>' : '<span class="badge badge-ok">OK</span>';
+    h += `<tr><td class="mono">${i.cod}</td><td style="max-width:120px;overflow:hidden;text-overflow:ellipsis">${i.nom}</td><td style="font-weight:700">${i.stock} ${i.uni}</td><td>${st}</td><td><button onclick="deleteItem('${i.id}')" style="background:var(--red-bg);border:none;color:var(--red);border-radius:6px;padding:5px 7px;cursor:pointer;font-size:14px"><i class="ti ti-trash" aria-hidden="true"></i></button></td></tr>`;
+  });
+  h += '</tbody></table></div>';
+  document.getElementById('inv-table').innerHTML = h;
+}
+
+function renderHistory() {
+  const q = document.getElementById('hist-search').value.toLowerCase();
+  const f = document.getElementById('hist-filter').value;
+  const filtered = moves.filter(m => (!f || m.tipo === f) && (!q || m.nom.toLowerCase().includes(q) || m.cod.toLowerCase().includes(q) || (m.ref||'').toLowerCase().includes(q) || (m.device||'').toLowerCase().includes(q)));
+  if (!filtered.length) { document.getElementById('hist-table').innerHTML = '<div class="empty"><i class="ti ti-history"></i>Sin movimientos</div>'; return; }
+  let h = '<div class="tbl-wrap"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Ítem</th><th>Cant.</th><th>Dispositivo</th></tr></thead><tbody>';
+  filtered.forEach(m => {
+    const badge = m.tipo === 'ENTRADA' ? '<span class="badge badge-in">↑ Ent.</span>' : '<span class="badge badge-ex">↓ Sal.</span>';
+    h += `<tr><td style="font-size:10px;color:var(--text2)">${m.fecha}</td><td>${badge}</td><td style="max-width:100px;overflow:hidden;text-overflow:ellipsis">${m.nom}</td><td style="font-weight:600">${m.tipo==='ENTRADA'?'+':'-'}${m.qty} ${m.uni}</td><td style="font-size:10px;color:var(--text2)">${m.device||'—'}</td></tr>`;
+  });
+  h += '</tbody></table></div>';
+  document.getElementById('hist-table').innerHTML = h;
+  const badge = document.getElementById('hist-badge');
+  badge.textContent = moves.length;
+  badge.classList.toggle('show', moves.length > 0);
+}
+
+function renderDash() {
+  const all = Object.values(items);
+  document.getElementById('m-total').textContent = all.length;
+  document.getElementById('m-ok').textContent = all.filter(i => i.stock > i.min).length;
+  document.getElementById('m-low').textContent = all.filter(i => i.stock > 0 && i.stock <= i.min).length;
+  document.getElementById('m-out').textContent = all.filter(i => i.stock === 0).length;
+  const alerts = all.filter(i => i.stock <= i.min);
+  if (!alerts.length) {
+    document.getElementById('alert-list').innerHTML = '<div class="empty"><i class="ti ti-check"></i>' + (all.length ? 'Todo en orden' : 'Inventario vacío') + '</div>';
+  } else {
+    let h = '<div class="tbl-wrap"><table><thead><tr><th>Código</th><th>Ítem</th><th>Stock</th><th>Estado</th></tr></thead><tbody>';
+    alerts.forEach(i => h += `<tr><td class="mono">${i.cod}</td><td>${i.nom}</td><td>${i.stock} ${i.uni}</td><td>${i.stock===0?'<span class="badge badge-out">Agotado</span>':'<span class="badge badge-low">Bajo</span>'}</td></tr>`);
+    h += '</tbody></table></div>';
+    document.getElementById('alert-list').innerHTML = h;
+  }
+  const recent = moves.slice(0, 5);
+  if (!recent.length) { document.getElementById('recent-moves').innerHTML = '<div class="empty"><i class="ti ti-clock"></i>Sin movimientos</div>'; return; }
+  let h = '';
+  recent.forEach(m => {
+    const cls = m.tipo === 'ENTRADA' ? 'in' : 'out';
+    const icon = m.tipo === 'ENTRADA' ? 'ti-package-import' : 'ti-package-export';
+    h += `<div class="activity-item"><div class="activity-icon ${cls}"><i class="ti ${icon}" aria-hidden="true"></i></div><div class="activity-body"><div class="activity-title">${m.nom}</div><div class="activity-meta">${m.tipo==='ENTRADA'?'+':'-'}${m.qty} ${m.uni} · ${m.fecha} · ${m.device||'—'}</div></div></div>`;
+  });
+  document.getElementById('recent-moves').innerHTML = h;
+}
+
+function populateSelects() {
+  const all = Object.values(items);
+  ['e-item','s-item'].forEach(sid => {
+    const sel = document.getElementById(sid);
+    if (!sel) return;
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">— Seleccionar ítem —</option>';
+    all.forEach(it => sel.innerHTML += `<option value="${it.id}">[${it.cod}] ${it.nom} (${it.stock} ${it.uni})</option>`);
+    if (prev) sel.value = prev;
+  });
+}
+
+// ─── SCAN ─────────────────────────────────────────────────
+function processCode(code) {
+  const it = Object.values(items).find(i => i.cod === code);
+  if (!it) {
+    showScanFb('err', `Código "${code}" no encontrado en inventario.`);
+    document.getElementById('scan-feedback-card').style.display = 'block';
+    document.getElementById('found-card').style.display = 'none';
+    lastScanned = null; return;
+  }
+  lastScanned = it;
+  const stClass = it.stock === 0 ? 'badge-out' : it.stock <= it.min ? 'badge-low' : 'badge-ok';
+  const stText  = it.stock === 0 ? 'Agotado' : it.stock <= it.min ? 'Stock bajo' : 'En stock';
+  document.getElementById('sr-status').innerHTML = `<span class="badge ${stClass}">${stText}</span>`;
+  document.getElementById('sr-name').textContent = it.nom;
+  document.getElementById('sr-info').innerHTML = `<span class="mono">${it.cod}</span> · Stock: <strong>${it.stock} ${it.uni}</strong> · Mín: ${it.min} · ${it.loc||'Sin ubicación'}`;
+  document.getElementById('sr-qty').value = 1;
+  document.getElementById('sr-ref').value = '';
+  showScanFb('ok', 'Ítem encontrado');
+  document.getElementById('scan-feedback-card').style.display = 'block';
+  document.getElementById('found-card').style.display = 'block';
+}
+
+window.doManualScan = function() {
+  const code = document.getElementById('scan-manual').value.trim();
+  if (!code) return;
+  processCode(code);
+  document.getElementById('scan-manual').value = '';
+};
+
+window.scanToSelect = function(scanId, selId, infoId) {
+  const code = document.getElementById(scanId).value.trim();
+  if (!code) return;
+  const it = Object.values(items).find(i => i.cod === code);
+  const msgId = scanId.startsWith('e') ? 'ent-msg' : 'sal-msg';
+  if (!it) { showMsg(msgId, 'err', `Código "${code}" no encontrado.`); return; }
+  document.getElementById(selId).value = it.id;
+  showStockInfo(selId, infoId);
+  document.getElementById(scanId).value = '';
+};
+
+window.showStockInfo = function(selId, infoId) {
+  const sel = document.getElementById(selId), info = document.getElementById(infoId);
+  if (!sel || !info) return;
+  const it = items[sel.value];
+  if (!it) { info.innerHTML = ''; return; }
+  const color = it.stock === 0 ? 'var(--red)' : it.stock <= it.min ? 'var(--amber)' : 'var(--green)';
+  info.innerHTML = `<i class="ti ti-info-circle" aria-hidden="true"></i> Stock: <strong style="color:${color}">${it.stock} ${it.uni}</strong> · Mín: ${it.min} · ${it.loc||'—'}`;
+};
+
+// ─── CAMERA ───────────────────────────────────────────────
+window.startMainCamera = function() {
+  if (typeof ZXing === 'undefined') { showToast('Librería de cámara no disponible', 'red'); return; }
+  document.getElementById('cam-idle-main').style.display = 'none';
+  document.getElementById('cam-active-main').style.display = 'block';
+  mainReader = new ZXing.BrowserMultiFormatReader();
+  mainReader.decodeFromConstraints({ video: { facingMode: 'environment' } }, document.getElementById('main-video'), (result, err) => {
+    if (result) { stopMainCamera(); processCode(result.getText()); }
+  });
+};
+
+window.stopMainCamera = function() {
+  if (mainReader) { try { mainReader.reset(); } catch(e){} mainReader = null; }
+  const v = document.getElementById('main-video');
+  if (v && v.srcObject) { v.srcObject.getTracks().forEach(t => t.stop()); v.srcObject = null; }
+  document.getElementById('cam-idle-main').style.display = 'block';
+  document.getElementById('cam-active-main').style.display = 'none';
+};
+
+window.openModal = function(targetInput, targetSelect) {
+  modalTargetInput = targetInput; modalTargetSelect = targetSelect;
+  document.getElementById('modal-overlay').classList.add('open');
+  document.getElementById('modal-fb').textContent = 'Apunta la cámara al código de barras o QR';
+  if (typeof ZXing === 'undefined') { document.getElementById('modal-fb').textContent = 'Cámara no disponible. Escribe el código manualmente.'; return; }
+  modalReader = new ZXing.BrowserMultiFormatReader();
+  modalReader.decodeFromConstraints({ video: { facingMode: 'environment' } }, document.getElementById('modal-video'), (result, err) => {
+    if (result) {
+      const code = result.getText();
+      closeModal();
+      if (modalTargetInput) {
+        const inp = document.getElementById(modalTargetInput);
+        if (inp) inp.value = code;
+      }
+      if (modalTargetSelect) {
+        const it = Object.values(items).find(i => i.cod === code);
+        if (it) {
+          const sel = document.getElementById(modalTargetSelect);
+          if (sel) { sel.value = it.id; const infoId = modalTargetSelect === 'e-item' ? 'e-sinfo' : 's-sinfo'; showStockInfo(modalTargetSelect, infoId); }
+        } else if (!modalTargetInput.startsWith('i')) {
+          showToast(`Código "${code}" no encontrado`, 'red');
+        }
+      }
+    }
+  });
+};
+
+window.closeModal = function() {
+  document.getElementById('modal-overlay').classList.remove('open');
+  if (modalReader) { try { modalReader.reset(); } catch(e){} modalReader = null; }
+  const v = document.getElementById('modal-video');
+  if (v && v.srcObject) { v.srcObject.getTracks().forEach(t => t.stop()); v.srcObject = null; }
+};
+
+// ─── NAVIGATION ───────────────────────────────────────────
+window.showSection = function(id, btn) {
+  ['panel','inv','scan','mov','mas'].forEach(s => {
+    const el = document.getElementById('s-'+s);
+    if (el) el.classList.toggle('active', s === id);
+  });
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (id === 'panel') renderDash();
+  if (id === 'inv') renderInventory();
+  if (id === 'mov') { populateSelects(); renderHistory(); }
+  if (id === 'scan') stopMainCamera();
+};
+
+window.switchMovTab = function(tab) {
+  document.getElementById('mov-ent').style.display = tab === 'ent' ? 'block' : 'none';
+  document.getElementById('mov-sal').style.display = tab === 'sal' ? 'block' : 'none';
+  document.getElementById('mov-tab-ent').className = 'btn ' + (tab === 'ent' ? 'btn-success' : 'btn-secondary');
+  document.getElementById('mov-tab-sal').className = 'btn ' + (tab === 'sal' ? 'btn-danger' : 'btn-secondary');
+};
+
+// ─── HELPERS ──────────────────────────────────────────────
+function now() { const d = new Date(); return d.toLocaleDateString('es-PE') + ' ' + d.toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'}); }
+function nowShort() { return new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'}); }
+function nowFile() { const d=new Date(); return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`; }
+
+function showMsg(id, type, text) {
+  const el = document.getElementById(id); if (!el) return;
+  el.className = 'msg ' + type;
+  el.innerHTML = `<i class="ti ti-${type==='ok'?'check':'alert-circle'}" aria-hidden="true"></i>${text}`;
+  clearTimeout(el._t); el._t = setTimeout(() => { el.className='msg'; el.innerHTML=''; }, 4500);
+}
+
+function showFbMsg(type, text) {
+  const el = document.getElementById('firebase-msg'); if (!el) return;
+  el.className = 'msg ' + type;
+  el.innerHTML = `<i class="ti ti-${type==='ok'?'check':'alert-circle'}" aria-hidden="true"></i>${text}`;
+  el.style.display = 'flex';
+}
+
+function showScanFb(type, text) {
+  const el = document.getElementById('scan-fb-msg'); if (!el) return;
+  el.style.color = type === 'ok' ? 'var(--green)' : 'var(--red)';
+  el.textContent = text;
+}
+
+let toastTimer;
+function showToast(text, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = text; t.className = 'toast ' + type + ' show';
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+function setSyncDot(state) {
+  const d = document.getElementById('sync-dot');
+  d.className = 'sync-dot ' + state;
+}
+
+function clearMovForm(prefix) {
+  document.getElementById(prefix+'-item').value = '';
+  document.getElementById(prefix+'-qty').value = '1';
+  [prefix+'-prov', prefix+'-fact', prefix+'-obs', prefix+'-scan'].forEach(f => { const el=document.getElementById(f); if(el) el.value=''; });
+  [prefix+'-sinfo'].forEach(f => { const el=document.getElementById(f); if(el) el.innerHTML=''; });
+  if (prefix==='s') { ['s-user','s-area','s-obs','s-scan'].forEach(f=>{const el=document.getElementById(f);if(el)el.value='';}); }
+  populateSelects();
+}
+
+// ─── CONFIG PERSISTENCE ───────────────────────────────────
+function saveConfig() {
+  const cfg = {
+    apikey: document.getElementById('cfg-apikey').value,
+    dburl:  document.getElementById('cfg-dburl').value,
+    projid: document.getElementById('cfg-projid').value,
+    appid:  document.getElementById('cfg-appid').value
+  };
+  localStorage.setItem('lab_firebase_cfg', JSON.stringify(cfg));
+}
+window.saveConfig = saveConfig;
+
+function loadConfig() {
+  try {
+    const cfg = JSON.parse(localStorage.getItem('lab_firebase_cfg') || '{}');
+    if (cfg.apikey) document.getElementById('cfg-apikey').value = cfg.apikey;
+    if (cfg.dburl)  document.getElementById('cfg-dburl').value  = cfg.dburl;
+    if (cfg.projid) document.getElementById('cfg-projid').value = cfg.projid;
+    if (cfg.appid)  document.getElementById('cfg-appid').value  = cfg.appid;
+  } catch(e) {}
+}
+
+window.saveDeviceName = function() {
+  myDeviceName = document.getElementById('cfg-devname').value.trim() || 'Dispositivo';
+  localStorage.setItem('lab_devname', myDeviceName);
+  document.getElementById('my-device-name').textContent = myDeviceName;
+};
+
+// ─── EXCEL ────────────────────────────────────────────────
+function styledSheet(ws, headers) {
+  headers.forEach((_, ci) => {
+    const cell = ws[XLSX.utils.encode_cell({r:0,c:ci})];
+    if (cell) cell.s = { font:{bold:true,color:{rgb:'FFFFFF'},sz:11}, fill:{fgColor:{rgb:'1D6F42'}}, alignment:{horizontal:'center'} };
+  });
+}
+function autoWidth(ws, data, headers) {
+  ws['!cols'] = headers.map((h,i) => ({wch: Math.max(h.length, data.reduce((m,r)=>Math.max(m,String(r[i]||'').length),0))+2}));
+}
+
+window.exportInventarioExcel = function() {
+  const all = Object.values(items);
+  if (!all.length) { showToast('Inventario vacío','red'); return; }
+  const h = ['Código','Nombre','Categoría','Unidad','Stock','Mínimo','Ubicación','Estado'];
+  const d = all.map(i=>[i.cod,i.nom,i.cat,i.uni,i.stock,i.min,i.loc||'',i.stock===0?'Agotado':i.stock<=i.min?'Stock bajo':'OK']);
+  const ws = XLSX.utils.aoa_to_sheet([h,...d]); styledSheet(ws,h); autoWidth(ws,d,h); ws['!freeze']={xSplit:0,ySplit:1};
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Inventario');
+  XLSX.writeFile(wb,`inventario_lab_${nowFile()}.xlsx`); showToast('Inventario descargado','green');
+};
+
+window.exportHistorialExcel = function() {
+  if (!moves.length) { showToast('Sin movimientos','red'); return; }
+  const h = ['Fecha','Tipo','Código','Ítem','Cantidad','Unidad','Referencia','Documento','Observaciones','Stock final','Dispositivo'];
+  const d = moves.map(m=>[m.fecha,m.tipo,m.cod,m.nom,m.tipo==='ENTRADA'?m.qty:-m.qty,m.uni,m.ref,m.doc,m.obs||'',m.stock,m.device||'—']);
+  const ws = XLSX.utils.aoa_to_sheet([h,...d]); styledSheet(ws,h); autoWidth(ws,d,h); ws['!freeze']={xSplit:0,ySplit:1};
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Historial');
+  XLSX.writeFile(wb,`historial_${nowFile()}.xlsx`); showToast('Historial descargado','green');
+};
+
+window.exportAlertasExcel = function() {
+  const alerts = Object.values(items).filter(i=>i.stock<=i.min);
+  if (!alerts.length) { showToast('Sin alertas activas','red'); return; }
+  const h = ['Código','Ítem','Categoría','Stock','Mínimo','Unidad','Ubicación','Estado','Déficit'];
+  const d = alerts.map(i=>[i.cod,i.nom,i.cat,i.stock,i.min,i.uni,i.loc||'',i.stock===0?'AGOTADO':'BAJO',Math.max(0,i.min-i.stock)]);
+  const ws = XLSX.utils.aoa_to_sheet([h,...d]); styledSheet(ws,h); autoWidth(ws,d,h); ws['!freeze']={xSplit:0,ySplit:1};
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Alertas');
+  XLSX.writeFile(wb,`alertas_${nowFile()}.xlsx`); showToast('Alertas descargadas','green');
+};
+
+window.exportCompletoExcel = function() {
+  const all = Object.values(items);
+  if (!all.length && !moves.length) { showToast('Sin datos','red'); return; }
+  const wb = XLSX.utils.book_new();
+  const hI=['Código','Nombre','Categoría','Unidad','Stock','Mínimo','Ubicación','Estado'];
+  const dI=all.length?all.map(i=>[i.cod,i.nom,i.cat,i.uni,i.stock,i.min,i.loc||'',i.stock===0?'Agotado':i.stock<=i.min?'Bajo':'OK']):[['Sin datos']];
+  const wsI=XLSX.utils.aoa_to_sheet([hI,...dI]); styledSheet(wsI,hI); autoWidth(wsI,dI,hI); wsI['!freeze']={xSplit:0,ySplit:1};
+  XLSX.utils.book_append_sheet(wb,wsI,'Inventario');
+  const hM=['Fecha','Tipo','Código','Ítem','Cantidad','Unidad','Referencia','Documento','Observaciones','Stock','Dispositivo'];
+  const dM=moves.length?moves.map(m=>[m.fecha,m.tipo,m.cod,m.nom,m.tipo==='ENTRADA'?m.qty:-m.qty,m.uni,m.ref,m.doc,m.obs||'',m.stock,m.device||'—']):[['Sin movimientos']];
+  const wsM=XLSX.utils.aoa_to_sheet([hM,...dM]); styledSheet(wsM,hM); autoWidth(wsM,dM,hM); wsM['!freeze']={xSplit:0,ySplit:1};
+  XLSX.utils.book_append_sheet(wb,wsM,'Historial');
+  const al=all.filter(i=>i.stock<=i.min);
+  const hA=['Código','Ítem','Stock','Mínimo','Unidad','Estado','Déficit'];
+  const dA=al.length?al.map(i=>[i.cod,i.nom,i.stock,i.min,i.uni,i.stock===0?'AGOTADO':'BAJO',Math.max(0,i.min-i.stock)]):[['Sin alertas']];
+  const wsA=XLSX.utils.aoa_to_sheet([hA,...dA]); styledSheet(wsA,hA); autoWidth(wsA,dA,hA); wsA['!freeze']={xSplit:0,ySplit:1};
+  XLSX.utils.book_append_sheet(wb,wsA,'Alertas');
+  XLSX.writeFile(wb,`reporte_completo_${nowFile()}.xlsx`); showToast('Reporte completo descargado','green');
+};
+
+renderDash();
+</script>
+</body>
+</html>
